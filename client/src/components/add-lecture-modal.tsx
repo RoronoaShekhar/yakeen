@@ -1,71 +1,66 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
 import {
   Form,
-  FormControl,
   FormField,
   FormItem,
   FormLabel,
+  FormControl,
   FormMessage,
 } from "@/components/ui/form";
-
 import {
   Select,
+  SelectTrigger,
   SelectContent,
   SelectItem,
-  SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+
+type LectureType = "live" | "recorded";
+
+const liveSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  subject: z.enum(["physics", "chemistry", "botany", "zoology"]),
+  lectureUrl: z
+    .string()
+    .regex(/^https:\/\/live-server\.dev-boi\.xyz/, "Invalid live-server URL"),
+});
+
+const recordedSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  subject: z.enum(["physics", "chemistry", "botany", "zoology"]),
+  youtubeUrl: z
+    .string()
+    .regex(/^https:\/\/youtu\.be\/[a-zA-Z0-9_-]+$/, "Invalid YouTube URL"),
+});
 
 interface AddLectureModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type LectureType = "live" | "recorded";
-
-// Combined dynamic schema
-const liveSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  subject: z.enum(["physics", "chemistry", "botany", "zoology"]),
-  lectureUrl: z.string().regex(
-    /^https:\/\/live-server.dev-boi.xyz/,
-    "Live link must start with https://live-server.dev-boi.xyz"
-  ),
-});
-
-const recordedSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  subject: z.enum(["physics", "chemistry", "botany", "zoology"]),
-  youtubeUrl: z.string().regex(
-    /^https:\/\/youtu.be\/[A-Za-z0-9_-]+$/,
-    "YouTube link must be youtu.be format"
-  ),
-});
-
 export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProps) {
   const [lectureType, setLectureType] = useState<LectureType>("live");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const schema = lectureType === "live" ? liveSchema : recordedSchema;
+
   const form = useForm({
-    resolver: zodResolver(lectureType === "live" ? liveSchema : recordedSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
       title: "",
       subject: undefined,
@@ -74,51 +69,60 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
     } as any,
   });
 
+  // Reset form whenever lecture type changes
   useEffect(() => {
-    form.reset();
+    form.reset({
+      title: "",
+      subject: undefined,
+      lectureUrl: "",
+      youtubeUrl: "",
+    });
   }, [lectureType]);
 
   const liveMutation = useMutation({
     mutationFn: (data: z.infer<typeof liveSchema>) =>
-      apiRequest("POST", "/api/live-lectures", data).then((r) => r.json()),
+      apiRequest("POST", "/api/live-lectures", data).then((res) => res.json()),
     onSuccess: () => {
-      queryClient.invalidateQueries(["/api/live-lectures"]);
-      toast({ title: "Success", description: "Live lecture added" });
+      queryClient.invalidateQueries({ queryKey: ["/api/live-lectures"] });
+      toast({ title: "Success", description: "Live lecture added." });
       onClose();
     },
   });
 
   const recordedMutation = useMutation({
     mutationFn: (data: z.infer<typeof recordedSchema>) =>
-      apiRequest("POST", "/api/recorded-lectures", data).then((r) => r.json()),
+      apiRequest("POST", "/api/recorded-lectures", data).then((res) => res.json()),
     onSuccess: () => {
-      queryClient.invalidateQueries(["/api/recorded-lectures"]);
-      toast({ title: "Success", description: "Recorded lecture added" });
+      queryClient.invalidateQueries({ queryKey: ["/api/recorded-lectures"] });
+      toast({ title: "Success", description: "Recorded lecture added." });
       onClose();
     },
   });
 
   const onSubmit = form.handleSubmit((data) => {
-    if (lectureType === "live") liveMutation.mutate(data as any);
-    else recordedMutation.mutate(data as any);
+    if (lectureType === "live") {
+      liveMutation.mutate(data);
+    } else {
+      recordedMutation.mutate(data);
+    }
   });
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Lecture</DialogTitle>
+          <DialogTitle>Add Lecture</DialogTitle>
         </DialogHeader>
 
         <div className="mb-4">
           <FormLabel>Lecture Type</FormLabel>
-          <Select value={lectureType} onValueChange={setLectureType}>
+          <Select value={lectureType} onValueChange={(val) => setLectureType(val as LectureType)}>
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue placeholder="Select type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="live">Live Lecture</SelectItem>
-              <SelectItem value="recorded">Recorded Lecture</SelectItem>
+              <SelectItem value="live">Live</SelectItem>
+              <SelectItem value="recorded">Recorded</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -133,23 +137,23 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
                 <FormItem>
                   <FormLabel>Title</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Enter lecture title" />
+                    <Input placeholder="Enter title" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Conditional URL Field */}
+            {/* URL */}
             {lectureType === "live" ? (
               <FormField
                 control={form.control}
                 name="lectureUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Lecture Link</FormLabel>
+                    <FormLabel>Live Link</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="https://live-server.dev-boi.xyz/..." />
+                      <Input placeholder="https://live-server.dev-boi.xyz/..." {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -163,7 +167,7 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
                   <FormItem>
                     <FormLabel>YouTube Link</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="https://youtu.be/..." />
+                      <Input placeholder="https://youtu.be/..." {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -179,7 +183,7 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
                 <FormItem>
                   <FormLabel>Subject</FormLabel>
                   <FormControl>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select subject" />
                       </SelectTrigger>
@@ -196,11 +200,12 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
               )}
             />
 
-            <div className="flex space-x-3 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+            {/* Buttons */}
+            <div className="flex space-x-2 pt-4">
+              <Button variant="outline" type="button" className="flex-1" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1">
+              <Button className="flex-1" type="submit">
                 Add Lecture
               </Button>
             </div>
@@ -209,4 +214,4 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
       </DialogContent>
     </Dialog>
   );
-                                 }
+            }
