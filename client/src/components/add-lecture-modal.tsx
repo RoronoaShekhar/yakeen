@@ -5,7 +5,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { insertLiveLectureSchema, insertRecordedLectureSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { z } from "zod";
-import { X } from "lucide-react";
 
 import {
   Dialog,
@@ -60,7 +59,7 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
     resolver: zodResolver(liveLectureFormSchema),
     defaultValues: {
       title: "",
-      subject: undefined,
+      subject: "", // changed from undefined
       lectureUrl: "",
     },
   });
@@ -69,7 +68,7 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
     resolver: zodResolver(recordedLectureFormSchema),
     defaultValues: {
       title: "",
-      subject: undefined,
+      subject: "", // changed from undefined
       youtubeUrl: "",
     },
   });
@@ -148,7 +147,7 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
           <DialogTitle>Add New Lecture</DialogTitle>
         </DialogHeader>
 
-        {/* Lecture Type Select (outside of form) */}
+        {/* Lecture Type Selection */}
         <div className="mb-4">
           <label className="text-sm font-medium block mb-1">Lecture Type</label>
           <Select value={lectureType} onValueChange={(value: LectureType) => setLectureType(value)}>
