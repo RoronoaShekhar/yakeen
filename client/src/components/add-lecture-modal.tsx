@@ -12,7 +12,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -150,9 +149,6 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add New Lecture</DialogTitle>
-          <DialogDescription>
-            Add a new live or recorded lecture to the platform
-          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
