@@ -2,10 +2,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { insertLiveLectureSchema, insertRecordedLectureSchema } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
 import { z } from "zod";
-
+import { apiRequest } from "@/lib/queryClient";
 import {
   Dialog,
   DialogContent,
@@ -38,17 +36,16 @@ interface AddLectureModalProps {
 
 type LectureType = "live" | "recorded";
 
-// Use the imported schemas or define them locally - pick one approach
-const liveLectureFormSchema = z.object({
+const liveSchema = z.object({
   title: z.string().min(1, "Title is required"),
   subject: z.enum(["physics", "chemistry", "botany", "zoology"]),
-  lectureUrl: z.string().regex(/^https:\/\/live-server\.dev-boi\.xyz/, "Please provide a valid live-server.dev-boi.xyz URL"),
+  lectureUrl: z.string().regex(/^https:\/\/live-server\.dev-boi\.xyz/, "Live link must start with https://live-server.dev-boi.xyz"),
 });
 
-const recordedLectureFormSchema = z.object({
+const recordedSchema = z.object({
   title: z.string().min(1, "Title is required"),
   subject: z.enum(["physics", "chemistry", "botany", "zoology"]),
-  youtubeUrl: z.string().regex(/^https:\/\/youtu\.be\/[a-zA-Z0-9_-]+$/, "Please provide a valid youtu.be URL"),
+  youtubeUrl: z.string().regex(/^https:\/\/youtu\.be\/[a-zA-Z0-9_-]+$/, "Only youtu.be links allowed"),
 });
 
 export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProps) {
@@ -56,100 +53,53 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const liveLectureForm = useForm({
-    resolver: zodResolver(liveLectureFormSchema),
-    defaultValues: {
-      title: "",
-      subject: undefined as any, // Use undefined for proper placeholder display
-      lectureUrl: "",
-    },
+  const liveForm = useForm({
+    resolver: zodResolver(liveSchema),
+    defaultValues: { title: "", subject: undefined, lectureUrl: "" },
   });
 
-  const recordedLectureForm = useForm({
-    resolver: zodResolver(recordedLectureFormSchema),
-    defaultValues: {
-      title: "",
-      subject: undefined as any, // Use undefined for proper placeholder display
-      youtubeUrl: "",
-    },
+  const recordedForm = useForm({
+    resolver: zodResolver(recordedSchema),
+    defaultValues: { title: "", subject: undefined, youtubeUrl: "" },
   });
-
-  const form = lectureType === "live" ? liveLectureForm : recordedLectureForm;
-
-  const resetAllForms = () => {
-    liveLectureForm.reset();
-    recordedLectureForm.reset();
-    setLectureType("live");
-  };
-
-  const handleClose = () => {
-    resetAllForms();
-    onClose();
-  };
-
-  // Handle lecture type change and reset current form
-  const handleLectureTypeChange = (value: LectureType) => {
-    // Reset the current form before switching
-    if (lectureType === "live") {
-      liveLectureForm.reset();
-    } else {
-      recordedLectureForm.reset();
-    }
-    setLectureType(value);
-  };
 
   const liveMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof liveLectureFormSchema>) => {
-      const response = await apiRequest("POST", "/api/live-lectures", data);
-      return response.json();
+    mutationFn: async (data: z.infer<typeof liveSchema>) => {
+      const res = await apiRequest("POST", "/api/live-lectures", data);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/live-lectures"] });
-      toast({
-        title: "Success",
-        description: "Live lecture added successfully",
-      });
-      resetAllForms();
+      toast({ title: "Success", description: "Live lecture added" });
+      liveForm.reset();
       onClose();
     },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add live lecture",
-        variant: "destructive",
-      });
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add live lecture", variant: "destructive" });
     },
   });
 
   const recordedMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof recordedLectureFormSchema>) => {
-      const response = await apiRequest("POST", "/api/recorded-lectures", data);
-      return response.json();
+    mutationFn: async (data: z.infer<typeof recordedSchema>) => {
+      const res = await apiRequest("POST", "/api/recorded-lectures", data);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/recorded-lectures"] });
-      toast({
-        title: "Success",
-        description: "Recorded lecture added successfully",
-      });
-      resetAllForms();
+      toast({ title: "Success", description: "Recorded lecture added" });
+      recordedForm.reset();
       onClose();
     },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add recorded lecture",
-        variant: "destructive",
-      });
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add recorded lecture", variant: "destructive" });
     },
   });
 
-  const onSubmit = (data: any) => {
-    if (lectureType === "live") {
-      liveMutation.mutate(data);
-    } else {
-      recordedMutation.mutate(data);
-    }
+  const handleClose = () => {
+    liveForm.reset();
+    recordedForm.reset();
+    setLectureType("live");
+    onClose();
   };
 
   return (
@@ -159,10 +109,9 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
           <DialogTitle>Add New Lecture</DialogTitle>
         </DialogHeader>
 
-        {/* Lecture Type Selection */}
         <div className="mb-4">
           <label className="text-sm font-medium block mb-1">Lecture Type</label>
-          <Select value={lectureType} onValueChange={handleLectureTypeChange}>
+          <Select value={lectureType} onValueChange={setLectureType}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -173,92 +122,131 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
           </Select>
         </div>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Title</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter lecture title" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {lectureType === "live" ? (
+        {lectureType === "live" ? (
+          <Form {...liveForm}>
+            <form onSubmit={liveForm.handleSubmit(liveMutation.mutate)} className="space-y-4">
               <FormField
-                control={form.control}
+                control={liveForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Lecture title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={liveForm.control}
                 name="lectureUrl"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Lecture Link</FormLabel>
                     <FormControl>
-                      <Input placeholder="https://live-server.dev-boi.xyz/..." {...field} />
+                      <Input {...field} placeholder="https://live-server.dev-boi.xyz/..." />
                     </FormControl>
                     <FormMessage />
-                    <p className="text-xs text-gray-500">Only live-server.dev-boi.xyz links are accepted</p>
                   </FormItem>
                 )}
               />
-            ) : (
               <FormField
-                control={form.control}
+                control={liveForm.control}
+                name="subject"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subject</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select subject" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="physics">Physics</SelectItem>
+                        <SelectItem value="chemistry">Chemistry</SelectItem>
+                        <SelectItem value="botany">Botany</SelectItem>
+                        <SelectItem value="zoology">Zoology</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex space-x-2 pt-2">
+                <Button type="button" variant="outline" className="flex-1" onClick={handleClose}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={liveMutation.isPending}>
+                  {liveMutation.isPending ? "Adding..." : "Add Lecture"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        ) : (
+          <Form {...recordedForm}>
+            <form onSubmit={recordedForm.handleSubmit(recordedMutation.mutate)} className="space-y-4">
+              <FormField
+                control={recordedForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Lecture title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={recordedForm.control}
                 name="youtubeUrl"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>YouTube Link</FormLabel>
                     <FormControl>
-                      <Input placeholder="https://youtu.be/..." {...field} />
+                      <Input {...field} placeholder="https://youtu.be/..." />
                     </FormControl>
                     <FormMessage />
-                    <p className="text-xs text-gray-500">Only youtu.be links are supported</p>
                   </FormItem>
                 )}
               />
-            )}
-
-            <FormField
-              control={form.control}
-              name="subject"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Subject</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select subject" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="physics">Physics</SelectItem>
-                      <SelectItem value="chemistry">Chemistry</SelectItem>
-                      <SelectItem value="botany">Botany</SelectItem>
-                      <SelectItem value="zoology">Zoology</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex space-x-3 pt-4">
-              <Button type="button" variant="outline" className="flex-1" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1"
-                disabled={liveMutation.isPending || recordedMutation.isPending}
-              >
-                {(liveMutation.isPending || recordedMutation.isPending) ? "Adding..." : "Add Lecture"}
-              </Button>
-            </div>
-          </form>
-        </Form>
+              <FormField
+                control={recordedForm.control}
+                name="subject"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subject</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select subject" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="physics">Physics</SelectItem>
+                        <SelectItem value="chemistry">Chemistry</SelectItem>
+                        <SelectItem value="botany">Botany</SelectItem>
+                        <SelectItem value="zoology">Zoology</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex space-x-2 pt-2">
+                <Button type="button" variant="outline" className="flex-1" onClick={handleClose}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={recordedMutation.isPending}>
+                  {recordedMutation.isPending ? "Adding..." : "Add Lecture"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        )}
       </DialogContent>
     </Dialog>
   );
