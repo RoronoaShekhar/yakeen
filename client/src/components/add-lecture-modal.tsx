@@ -38,6 +38,7 @@ interface AddLectureModalProps {
 
 type LectureType = "live" | "recorded";
 
+// Use the imported schemas or define them locally - pick one approach
 const liveLectureFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   subject: z.enum(["physics", "chemistry", "botany", "zoology"]),
@@ -59,7 +60,7 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
     resolver: zodResolver(liveLectureFormSchema),
     defaultValues: {
       title: "",
-      subject: "", // changed from undefined
+      subject: undefined as any, // Use undefined for proper placeholder display
       lectureUrl: "",
     },
   });
@@ -68,7 +69,7 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
     resolver: zodResolver(recordedLectureFormSchema),
     defaultValues: {
       title: "",
-      subject: "", // changed from undefined
+      subject: undefined as any, // Use undefined for proper placeholder display
       youtubeUrl: "",
     },
   });
@@ -86,8 +87,19 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
     onClose();
   };
 
+  // Handle lecture type change and reset current form
+  const handleLectureTypeChange = (value: LectureType) => {
+    // Reset the current form before switching
+    if (lectureType === "live") {
+      liveLectureForm.reset();
+    } else {
+      recordedLectureForm.reset();
+    }
+    setLectureType(value);
+  };
+
   const liveMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: z.infer<typeof liveLectureFormSchema>) => {
       const response = await apiRequest("POST", "/api/live-lectures", data);
       return response.json();
     },
@@ -110,7 +122,7 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
   });
 
   const recordedMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: z.infer<typeof recordedLectureFormSchema>) => {
       const response = await apiRequest("POST", "/api/recorded-lectures", data);
       return response.json();
     },
@@ -150,7 +162,7 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
         {/* Lecture Type Selection */}
         <div className="mb-4">
           <label className="text-sm font-medium block mb-1">Lecture Type</label>
-          <Select value={lectureType} onValueChange={(value: LectureType) => setLectureType(value)}>
+          <Select value={lectureType} onValueChange={handleLectureTypeChange}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -215,7 +227,7 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Subject</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select subject" />
