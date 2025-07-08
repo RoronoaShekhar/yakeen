@@ -82,7 +82,6 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
     setLectureType("live");
   };
 
-  // Reset forms when modal is closed
   const handleClose = () => {
     resetAllForms();
     onClose();
@@ -142,8 +141,6 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
     }
   };
 
-
-
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
@@ -151,30 +148,22 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
           <DialogTitle>Add New Lecture</DialogTitle>
         </DialogHeader>
 
+        {/* Lecture Type Select (outside of form) */}
+        <div className="mb-4">
+          <label className="text-sm font-medium block mb-1">Lecture Type</label>
+          <Select value={lectureType} onValueChange={(value: LectureType) => setLectureType(value)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="live">Live Lecture</SelectItem>
+              <SelectItem value="recorded">Recorded Lecture</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="lectureType"
-              render={() => (
-                <FormItem>
-                  <FormLabel>Lecture Type</FormLabel>
-                  <Select
-                    value={lectureType}
-                    onValueChange={(value: LectureType) => setLectureType(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="live">Live Lecture</SelectItem>
-                      <SelectItem value="recorded">Recorded Lecture</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
-
             <FormField
               control={form.control}
               name="title"
@@ -245,15 +234,13 @@ export default function AddLectureModal({ isOpen, onClose }: AddLectureModalProp
               )}
             />
 
-
-
             <div className="flex space-x-3 pt-4">
               <Button type="button" variant="outline" className="flex-1" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                className="flex-1" 
+              <Button
+                type="submit"
+                className="flex-1"
                 disabled={liveMutation.isPending || recordedMutation.isPending}
               >
                 {(liveMutation.isPending || recordedMutation.isPending) ? "Adding..." : "Add Lecture"}
