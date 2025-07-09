@@ -40,6 +40,22 @@ export default function Subject() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (lectureId: number) => {
+      const response = await apiRequest("DELETE", `/api/recorded-lectures/${lectureId}`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recorded-lectures", subject] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recorded-lectures"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      toast({
+        title: "Success",
+        description: "Lecture deleted successfully",
+      });
+    },
+  });
+
   const handleShowActions = (lecture: RecordedLecture) => {
     setSelectedLecture(lecture);
     setIsActionModalOpen(true);
@@ -55,6 +71,12 @@ export default function Subject() {
 
   const handleBookmarkLecture = (lecture: RecordedLecture) => {
     bookmarkMutation.mutate(lecture.id);
+  };
+
+  const handleDeleteLecture = (lecture: RecordedLecture) => {
+    if (confirm(`Are you sure you want to delete "${lecture.title}"?`)) {
+      deleteMutation.mutate(lecture.id);
+    }
   };
 
   const goBack = () => {
@@ -136,6 +158,7 @@ export default function Subject() {
                   lecture={lecture}
                   onShowActions={handleShowActions}
                   onBookmark={handleBookmarkLecture}
+                  onDelete={handleDeleteLecture}
                 />
               ))}
             </div>

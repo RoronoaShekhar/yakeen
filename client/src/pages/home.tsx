@@ -51,6 +51,21 @@ export default function Home() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (lectureId: number) => {
+      const response = await apiRequest("DELETE", `/api/recorded-lectures/${lectureId}`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recorded-lectures"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      toast({
+        title: "Success",
+        description: "Lecture deleted successfully",
+      });
+    },
+  });
+
   // Handlers
   const handleJoinLecture = (lecture: LiveLecture) => {
     if (lecture.lectureUrl) {
@@ -75,6 +90,12 @@ export default function Home() {
     bookmarkMutation.mutate(lecture.id);
   };
 
+  const handleDeleteLecture = (lecture: RecordedLecture) => {
+    if (confirm(`Are you sure you want to delete "${lecture.title}"?`)) {
+      deleteMutation.mutate(lecture.id);
+    }
+  };
+
   const subjectDescriptions = {
     physics: "Mechanics, Thermodynamics, Optics",
     chemistry: "Organic, Inorganic, Physical",
@@ -97,12 +118,12 @@ export default function Home() {
         <section id="live" className="mb-12">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
             <div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-2">Live Lectures</h3>
-              <p className="text-gray-600">Join ongoing and upcoming sessions</p>
+              <h3 className="text-2xl heading-secondary text-gray-800 mb-2">Live Lectures</h3>
+              <p className="text-body">Join ongoing and upcoming sessions</p>
             </div>
             <Button
               onClick={() => setIsAddModalOpen(true)}
-              className="mt-4 sm:mt-0 bg-blue-500 hover:bg-blue-600"
+              className="mt-4 sm:mt-0 bg-gradient-hero button-modern"
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Live Lecture
@@ -112,7 +133,7 @@ export default function Home() {
           {isLoadingLive ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 animate-pulse">
+                <div key={i} className="card-modern p-6 animate-pulse">
                   <div className="h-32 bg-gray-200 rounded-lg"></div>
                 </div>
               ))}
@@ -128,11 +149,11 @@ export default function Home() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
+            <div className="text-center py-12 card-modern">
               <Video className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h4 className="text-lg font-medium text-gray-900 mb-2">No Live Lectures</h4>
-              <p className="text-gray-600 mb-4">No live lectures are currently scheduled.</p>
-              <Button onClick={() => setIsAddModalOpen(true)}>
+              <h4 className="text-lg heading-secondary text-gray-900 mb-2">No Live Lectures</h4>
+              <p className="text-body mb-4">No live lectures are currently scheduled.</p>
+              <Button onClick={() => setIsAddModalOpen(true)} className="button-modern bg-gradient-hero">
                 <Plus className="mr-2 h-4 w-4" />
                 Add First Live Lecture
               </Button>
@@ -144,12 +165,13 @@ export default function Home() {
         <section id="recorded" className="mb-12">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
             <div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-2">Recorded Lectures</h3>
-              <p className="text-gray-600">Browse by subject and study at your pace</p>
+              <h3 className="text-2xl heading-secondary text-gray-800 mb-2">Recorded Lectures</h3>
+              <p className="text-body">Browse by subject and study at your pace</p>
             </div>
             <Button
               onClick={() => setIsAddModalOpen(true)}
               variant="outline"
+              className="button-modern"
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Lecture
@@ -173,10 +195,10 @@ export default function Home() {
           </div>
 
           {/* Recent Recorded Lectures List */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="card-modern overflow-hidden">
             <div className="p-6 border-b border-gray-100">
-              <h4 className="text-lg font-semibold text-gray-800">Recent Recordings</h4>
-              <p className="text-sm text-gray-600">Latest lectures added to the library</p>
+              <h4 className="text-lg heading-secondary text-gray-800">Recent Recordings</h4>
+              <p className="text-sm text-body">Latest lectures added to the library</p>
             </div>
 
             {isLoadingRecorded ? (
@@ -202,12 +224,13 @@ export default function Home() {
                       lecture={lecture}
                       onShowActions={handleShowActions}
                       onBookmark={handleBookmarkLecture}
+                      onDelete={handleDeleteLecture}
                     />
                   ))}
                 </div>
 
                 <div className="p-6 border-t border-gray-100 text-center">
-                  <button className="text-blue-600 font-medium hover:text-blue-700 transition-colors duration-200">
+                  <button className="text-primary font-medium hover:text-primary/80 transition-colors duration-200">
                     View All Recordings <ArrowRight className="inline ml-1 h-4 w-4" />
                   </button>
                 </div>
@@ -215,9 +238,9 @@ export default function Home() {
             ) : (
               <div className="p-6 text-center">
                 <BookOpen className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h4 className="text-lg font-medium text-gray-900 mb-2">No Recorded Lectures</h4>
-                <p className="text-gray-600 mb-4">No recorded lectures have been added yet.</p>
-                <Button onClick={() => setIsAddModalOpen(true)}>
+                <h4 className="text-lg heading-secondary text-gray-900 mb-2">No Recorded Lectures</h4>
+                <p className="text-body mb-4">No recorded lectures have been added yet.</p>
+                <Button onClick={() => setIsAddModalOpen(true)} className="button-modern bg-gradient-hero">
                   <Plus className="mr-2 h-4 w-4" />
                   Add First Lecture
                 </Button>
@@ -228,19 +251,19 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-16">
+      <footer className="bg-white/80 backdrop-blur-sm border-t border-gray-200/50 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center space-x-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-green-500 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-hero rounded-xl flex items-center justify-center shadow-lg">
                   <i className="fas fa-graduation-cap text-white text-lg"></i>
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-gradient-primary">NEET Study Hub</h3>
+                  <h3 className="text-xl heading-primary text-gradient-primary">NEET Study Hub</h3>
                 </div>
               </div>
-              <p className="text-gray-600 max-w-md">
+              <p className="text-body max-w-md">
                 Your comprehensive platform for NEET preparation with live lectures, recorded sessions, 
                 and expert guidance to achieve your medical career goals.
               </p>

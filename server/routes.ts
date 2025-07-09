@@ -1,12 +1,45 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+
 import { storage } from "./storage";
 import { insertLiveLectureSchema, insertRecordedLectureSchema } from "@shared/schema";
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
+import multer from "multer";
+
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+// Firebase Storage will be handled with client SDK for simplicity
+// For now, we'll use a placeholder for recordings upload
+
+// Multer setup for file uploads
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Session configuration
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { pool } from "./db";
+
+const PgSession = connectPgSimple(session);
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Session middleware
+  app.use(session({
+    store: new PgSession({
+      pool: pool,
+      tableName: 'session',
+      createTableIfMissing: true,
+    }),
+    secret: process.env.SESSION_SECRET || 'neet-study-hub-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: false, // Set to true in production with HTTPS
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  }));
   // Serve player.html
   app.get("/player.html", async (req, res) => {
     try {
@@ -125,6 +158,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/recorded-lectures/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteRecordedLecture(id);
+      
+      if (success) {
+        res.json({ message: "Recorded lecture deleted successfully" });
+      } else {
+        res.status(404).json({ message: "Recorded lecture not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete recorded lecture" });
+    }
+  });
+
   app.patch("/api/recorded-lectures/:id/views", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -181,6 +229,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Keep-alive ping endpoint
+  app.get("/api/ping", async (req, res) => {
+    res.json({ 
+      status: "alive", 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
+  });
+
+
+
+
+
+  // Delete expired live lectures every minute
+  setInterval(() => {
+    storage.deleteExpiredLiveLectures();
+  }, 60000); // 1 minute
+
   const httpServer = createServer(app);
+  
+
+  
   return httpServer;
 }
