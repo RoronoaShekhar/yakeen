@@ -1,45 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-
 import { storage } from "./storage";
 import { insertLiveLectureSchema, insertRecordedLectureSchema } from "@shared/schema";
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
-import multer from "multer";
-
-import { db } from "./db";
-import { eq } from "drizzle-orm";
-// Firebase Storage will be handled with client SDK for simplicity
-// For now, we'll use a placeholder for recordings upload
-
-// Multer setup for file uploads
-const upload = multer({ storage: multer.memoryStorage() });
-
-// Session configuration
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
-import { pool } from "./db";
-
-const PgSession = connectPgSimple(session);
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Session middleware
-  app.use(session({
-    store: new PgSession({
-      pool: pool,
-      tableName: 'session',
-      createTableIfMissing: true,
-    }),
-    secret: process.env.SESSION_SECRET || 'neet-study-hub-secret',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: false, // Set to true in production with HTTPS
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    },
-  }));
   // Serve player.html
   app.get("/player.html", async (req, res) => {
     try {
@@ -80,7 +47,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteLiveLecture(id);
-      
+
       if (success) {
         res.json({ message: "Live lecture deleted successfully" });
       } else {
@@ -95,9 +62,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const { viewers } = req.body;
-      
+
       const updated = await storage.updateLiveLecture(id, { viewers });
-      
+
       if (updated) {
         res.json(updated);
       } else {
@@ -146,10 +113,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/recorded-lectures/:id/bookmark", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const updated = await storage.toggleBookmark(id);
-      
-      if (updated) {
-        res.json(updated);
+      const lecture = await storage.toggleBookmark(id);
+
+      if (lecture) {
+        res.json(lecture);
       } else {
         res.status(404).json({ message: "Recorded lecture not found" });
       }
@@ -158,28 +125,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/recorded-lectures/:id", async (req, res) => {
+  app.post("/api/recorded-lectures/bulk", async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const success = await storage.deleteRecordedLecture(id);
-      
-      if (success) {
-        res.json({ message: "Recorded lecture deleted successfully" });
-      } else {
-        res.status(404).json({ message: "Recorded lecture not found" });
+      const { lectures } = req.body;
+
+      if (!Array.isArray(lectures)) {
+        res.status(400).json({ message: "Lectures must be an array" });
+        return;
       }
+
+      const addedLectures = [];
+      let errorCount = 0;
+
+      for (const lecture of lectures) {
+        try {
+          if (!lecture.subject || !lecture.lecture_name || !lecture.lecture_link) {
+            errorCount++;
+            continue;
+          }
+
+          const newLecture = await storage.createRecordedLecture({
+            title: lecture.lecture_name,
+            subject: lecture.subject.toLowerCase(),
+            youtubeUrl: lecture.lecture_link,
+            uploadDate: new Date(),
+          });
+          addedLectures.push(newLecture);
+        } catch (error) {
+          errorCount++;
+        }
+      }
+
+      res.json({
+        message: `Successfully added ${addedLectures.length} lectures${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+        added: addedLectures.length,
+        failed: errorCount
+      });
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete recorded lecture" });
+      res.status(500).json({ message: "Failed to process bulk lectures" });
     }
   });
 
   app.patch("/api/recorded-lectures/:id/views", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const lecture = await storage.updateRecordedLecture(id, { 
-        views: (await storage.getRecordedLectures()).find(l => l.id === id)?.views || 0 + 1 
+      const lecture = await storage.updateRecordedLecture(id, {
+        views: (await storage.getRecordedLectures()).find(l => l.id === id)?.views || 0 + 1
       });
-      
+
       if (lecture) {
         res.json(lecture);
       } else {
@@ -194,7 +187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteRecordedLecture(id);
-      
+
       if (success) {
         res.json({ message: "Recorded lecture deleted successfully" });
       } else {
@@ -210,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const liveLectures = await storage.getLiveLectures();
       const recordedLectures = await storage.getRecordedLectures();
-      
+
       const stats = {
         liveLectures: liveLectures.length,
         recordedLectures: recordedLectures.length,
@@ -222,34 +215,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           zoology: recordedLectures.filter(l => l.subject === 'zoology').length,
         }
       };
-      
+
       res.json(stats);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch stats" });
     }
   });
 
-  // Keep-alive ping endpoint
-  app.get("/api/ping", async (req, res) => {
-    res.json({ 
-      status: "alive", 
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime()
-    });
-  });
-
-
-
-
-
-  // Delete expired live lectures every minute
-  setInterval(() => {
-    storage.deleteExpiredLiveLectures();
-  }, 60000); // 1 minute
-
   const httpServer = createServer(app);
-  
-
-  
   return httpServer;
 }

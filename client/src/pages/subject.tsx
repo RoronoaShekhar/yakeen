@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { RecordedLecture } from "@shared/schema";
@@ -40,22 +40,6 @@ export default function Subject() {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (lectureId: number) => {
-      const response = await apiRequest("DELETE", `/api/recorded-lectures/${lectureId}`, {});
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/recorded-lectures", subject] });
-      queryClient.invalidateQueries({ queryKey: ["/api/recorded-lectures"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      toast({
-        title: "Success",
-        description: "Lecture deleted successfully",
-      });
-    },
-  });
-
   const handleShowActions = (lecture: RecordedLecture) => {
     setSelectedLecture(lecture);
     setIsActionModalOpen(true);
@@ -71,12 +55,6 @@ export default function Subject() {
 
   const handleBookmarkLecture = (lecture: RecordedLecture) => {
     bookmarkMutation.mutate(lecture.id);
-  };
-
-  const handleDeleteLecture = (lecture: RecordedLecture) => {
-    if (confirm(`Are you sure you want to delete "${lecture.title}"?`)) {
-      deleteMutation.mutate(lecture.id);
-    }
   };
 
   const goBack = () => {
@@ -112,7 +90,7 @@ export default function Subject() {
             <div className="relative z-10">
               <div className="flex items-center space-x-4 mb-4">
                 <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-                  <i className={`${getSubjectIcon(subject)} text-3xl`}></i>
+                  {React.createElement(getSubjectIcon(subject), { className: "w-8 h-8 text-white" })}
                 </div>
                 <div>
                   <h1 className="text-4xl font-bold">{subjectName}</h1>
@@ -158,7 +136,6 @@ export default function Subject() {
                   lecture={lecture}
                   onShowActions={handleShowActions}
                   onBookmark={handleBookmarkLecture}
-                  onDelete={handleDeleteLecture}
                 />
               ))}
             </div>

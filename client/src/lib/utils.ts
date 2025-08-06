@@ -37,13 +37,15 @@ export function getSubjectColor(subject: string): string {
   }
 }
 
-export function getSubjectIcon(subject: string): string {
+import { Atom, FlaskConical, Leaf, Bug, BookOpen } from "lucide-react";
+
+export function getSubjectIcon(subject: string) {
   switch (subject) {
-    case 'physics': return 'fas fa-atom';
-    case 'chemistry': return 'fas fa-flask';
-    case 'botany': return 'fas fa-leaf';
-    case 'zoology': return 'fas fa-dna';
-    default: return 'fas fa-book';
+    case 'physics': return Atom;
+    case 'chemistry': return FlaskConical;
+    case 'botany': return Leaf;
+    case 'zoology': return Bug;
+    default: return BookOpen;
   }
 }
 

@@ -36,13 +36,13 @@ The application defines two main entities:
 - **Live Lectures**: Real-time streaming lectures with viewer counts and scheduling
 - **Recorded Lectures**: On-demand video content with bookmarking and view tracking
 
-Both entities support the four NEET subjects and include YouTube integration for video content. The application focuses purely on educational content management without any calling or communication features.
+Both entities support the four NEET subjects and include YouTube integration for video content.
 
 ## Data Flow
 
 1. **Client Requests**: React components make API calls through TanStack Query
 2. **Server Processing**: Express routes handle requests and interact with storage layer
-3. **Data Storage**: DatabaseStorage with PostgreSQL for recorded lectures, in-memory for live lectures
+3. **Data Storage**: Currently uses in-memory storage (MemStorage) with PostgreSQL schema defined
 4. **Real-time Updates**: Automatic cleanup for expired live lectures via intervals
 
 ## External Dependencies
@@ -75,15 +75,6 @@ The deployment strategy supports both development and production environments wi
 
 ```
 Changelog:
-- July 09, 2025. Switched to user's Supabase PostgreSQL database for data persistence
-- July 09, 2025. Removed Android/Capacitor mobile app files and unnecessary environment variables
-- July 09, 2025. Added database seeding with 8 sample NEET lectures covering all subjects
-- July 09, 2025. Fixed API errors and database connection issues
-- July 09, 2025. Removed all calling, meeting, and voice communication features completely at user request
-- July 09, 2025. Cleaned up WebRTC, Jitsi Meet, Firebase recording components and related database schemas
-- July 09, 2025. Simplified application to focus solely on lecture management system
-- July 09, 2025. Implemented database storage for recorded lectures using PostgreSQL and Drizzle ORM
-- July 09, 2025. Fixed AddLectureModal form handling and added keep-alive ping mechanism  
 - July 08, 2025. Initial setup
 ```
 
