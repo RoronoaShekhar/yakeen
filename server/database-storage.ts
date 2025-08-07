@@ -1,100 +1,133 @@
-
 import { db } from './db';
-import { liveLectures, recordedLectures } from '@shared/schema';
+import { liveLectures, recordedLectures, type LiveLecture, type InsertLiveLecture, type RecordedLecture, type InsertRecordedLecture } from '@shared/schema';
 import { eq, desc } from 'drizzle-orm';
-import { LiveLecture, RecordedLecture, InsertLiveLecture, InsertRecordedLecture } from '@shared/schema';
-import { IStorage } from './storage';
 
-export class DatabaseStorage implements IStorage {
+export class DatabaseStorage {
   // Live Lectures
-  async createLiveLecture(insertLecture: InsertLiveLecture): Promise<LiveLecture> {
-    const [lecture] = await db.insert(liveLectures).values({
-      ...insertLecture,
-      isLive: true,
-      viewers: 0,
-    }).returning();
-    return lecture;
+  async createLiveLecture(data: InsertLiveLecture): Promise<LiveLecture> {
+    try {
+      const [lecture] = await db.insert(liveLectures).values({
+        ...data,
+        isLive: true,
+        viewers: 0,
+      }).returning();
+      return lecture;
+    } catch (error) {
+      console.error('Error creating live lecture:', error);
+      throw new Error('Failed to create live lecture');
+    }
   }
 
   async getLiveLectures(): Promise<LiveLecture[]> {
-    return await db.select().from(liveLectures).orderBy(desc(liveLectures.createdAt));
+    try {
+      return await db.select().from(liveLectures).orderBy(liveLectures.createdAt);
+    } catch (error) {
+      console.error('Error fetching live lectures:', error);
+      return [];
+    }
   }
 
   async updateLiveLecture(id: number, updates: Partial<LiveLecture>): Promise<LiveLecture | undefined> {
-    const [updated] = await db.update(liveLectures)
-      .set(updates)
-      .where(eq(liveLectures.id, id))
-      .returning();
-    return updated;
+    try {
+      const [updated] = await db.update(liveLectures)
+        .set(updates)
+        .where(eq(liveLectures.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error('Error updating live lecture:', error);
+      return undefined;
+    }
   }
 
   async deleteLiveLecture(id: number): Promise<boolean> {
-    const result = await db.delete(liveLectures).where(eq(liveLectures.id, id));
-    return result.rowCount > 0;
-  }
-
-  async deleteExpiredLiveLectures(): Promise<number> {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const result = await db.delete(liveLectures)
-      .where(eq(liveLectures.createdAt, oneDayAgo));
-    return result.rowCount;
+    try {
+      const result = await db.delete(liveLectures).where(eq(liveLectures.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting live lecture:', error);
+      return false;
+    }
   }
 
   // Recorded Lectures
-  async createRecordedLecture(insertLecture: InsertRecordedLecture): Promise<RecordedLecture> {
-    const [lecture] = await db.insert(recordedLectures).values({
-      ...insertLecture,
-      views: 0,
-      isBookmarked: false,
-    }).returning();
-    return lecture;
+  async createRecordedLecture(data: InsertRecordedLecture): Promise<RecordedLecture> {
+    try {
+      const [lecture] = await db.insert(recordedLectures).values({
+        ...data,
+        views: 0,
+        isBookmarked: false,
+      }).returning();
+      return lecture;
+    } catch (error) {
+      console.error('Error creating recorded lecture:', error);
+      throw new Error('Failed to create recorded lecture');
+    }
   }
 
   async getRecordedLectures(subject?: string): Promise<RecordedLecture[]> {
-    let query = db.select().from(recordedLectures);
-    
-    if (subject) {
-      query = query.where(eq(recordedLectures.subject, subject));
+    try {
+      if (subject) {
+        return await db.select().from(recordedLectures)
+          .where(eq(recordedLectures.subject, subject))
+          .orderBy(desc(recordedLectures.uploadDate));
+      }
+      return await db.select().from(recordedLectures).orderBy(desc(recordedLectures.uploadDate));
+    } catch (error) {
+      console.error('Error fetching recorded lectures:', error);
+      return [];
     }
-    
-    return await query.orderBy(desc(recordedLectures.uploadDate));
   }
 
   async getRecordedLecturesBySubject(subject: string): Promise<RecordedLecture[]> {
-    return this.getRecordedLectures(subject);
+    try {
+      return await db.select().from(recordedLectures)
+        .where(eq(recordedLectures.subject, subject))
+        .orderBy(desc(recordedLectures.uploadDate));
+    } catch (error) {
+      console.error('Error fetching lectures by subject:', error);
+      return [];
+    }
   }
 
   async updateRecordedLecture(id: number, updates: Partial<RecordedLecture>): Promise<RecordedLecture | undefined> {
-    const [updated] = await db.update(recordedLectures)
-      .set(updates)
-      .where(eq(recordedLectures.id, id))
-      .returning();
-    return updated;
-  }
-
-  async deleteRecordedLecture(id: number): Promise<boolean> {
-    const result = await db.delete(recordedLectures).where(eq(recordedLectures.id, id));
-    return result.rowCount > 0;
+    try {
+      const [updated] = await db.update(recordedLectures)
+        .set(updates)
+        .where(eq(recordedLectures.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error('Error updating recorded lecture:', error);
+      return undefined;
+    }
   }
 
   async toggleBookmark(id: number): Promise<RecordedLecture | undefined> {
-    const [lecture] = await db.select().from(recordedLectures).where(eq(recordedLectures.id, id));
-    if (!lecture) return undefined;
+    try {
+      const [current] = await db.select().from(recordedLectures).where(eq(recordedLectures.id, id));
+      if (!current) return undefined;
 
-    const [updated] = await db.update(recordedLectures)
-      .set({ isBookmarked: !lecture.isBookmarked })
-      .where(eq(recordedLectures.id, id))
-      .returning();
-    return updated;
+      const [updated] = await db.update(recordedLectures)
+        .set({ isBookmarked: !current.isBookmarked })
+        .where(eq(recordedLectures.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      return undefined;
+    }
   }
 
-  async createBulkRecordedLectures(lectures: InsertRecordedLecture[]): Promise<RecordedLecture[]> {
-    return await db.insert(recordedLectures).values(
-      lectures.map(lecture => ({
-        ...lecture,
-        views: 0,
-        isBookmarked: false,
-      }))
-    ).returning();
+  async deleteRecordedLecture(id: number): Promise<boolean> {
+    try {
+      await db.delete(recordedLectures).where(eq(recordedLectures.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting recorded lecture:', error);
+      return false;
+    }
   }
 }
+
+export const databaseStorage = new DatabaseStorage();

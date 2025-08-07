@@ -1,9 +1,12 @@
 import { LiveLecture } from "@shared/schema";
 import { getSubjectColor, getSubjectIcon } from "@/lib/utils";
-import { Clock, Users, Play, Bell, ArrowRight } from "lucide-react";
+import { Clock, Users, Play, Bell, ArrowRight, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import React from "react"; // Import React
+import { Button } from "@/components/ui/button";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "../hooks/use-toast";
 
 interface LiveLectureCardProps {
   lecture: LiveLecture;
@@ -15,6 +18,42 @@ interface LiveLectureCardProps {
 export default function LiveLectureCard({ lecture, onJoin }: LiveLectureCardProps) {
   const isLive = lecture.isLive;
   const startingSoon = !isLive && lecture.startTime && new Date(lecture.startTime) > new Date();
+
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/live-lectures/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete lecture');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["live-lectures"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
+      toast({
+        title: "Success",
+        description: "Live lecture deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete lecture",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDelete = () => {
+    if (window.confirm("Are you sure you want to delete this live lecture?")) {
+      deleteMutation.mutate(lecture.id);
+    }
+  };
 
   return (
     <Card className="group overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-500 bg-white/90 backdrop-blur-sm card-hover relative">
@@ -72,33 +111,22 @@ export default function LiveLectureCard({ lecture, onJoin }: LiveLectureCardProp
         </div>
       </div>
 
-      <button 
-        onClick={() => onJoin(lecture)}
-        className={`w-full py-3 rounded-xl font-semibold transition-colors duration-300 relative z-10 ${
-          isLive
-            ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md shadow-blue-200'
-            : startingSoon
-            ? 'bg-yellow-500 text-white hover:bg-yellow-600 shadow-md shadow-yellow-200'
-            : 'bg-gray-500 text-white hover:bg-gray-600 shadow-md shadow-gray-200'
-        }`}
-      >
-        {isLive ? (
-          <>
+      <div className="flex gap-2 px-6 pb-6">
+        <Button asChild className="flex-1">
+          <a href={lecture.lectureUrl} target="_blank" rel="noopener noreferrer">
             <Play className="inline mr-2 h-4 w-4" />
             Join Live
-          </>
-        ) : startingSoon ? (
-          <>
-            <Bell className="inline mr-2 h-4 w-4" />
-            Set Reminder
-          </>
-        ) : (
-          <>
-            <Clock className="inline mr-2 h-4 w-4" />
-            Scheduled
-          </>
-        )}
-      </button>
+          </a>
+        </Button>
+        <Button
+          variant="destructive"
+          size="icon"
+          onClick={handleDelete}
+          disabled={deleteMutation.isPending}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
     </Card>
   );
 }

@@ -1,10 +1,22 @@
+
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { databaseStorage } from "./database-storage";
 import { storage } from "./storage";
 import { insertLiveLectureSchema, insertRecordedLectureSchema } from "@shared/schema";
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
+
+// Use database storage with fallback to memory storage
+const getStorage = () => {
+  try {
+    return databaseStorage;
+  } catch (error) {
+    console.warn("Database storage unavailable, falling back to memory storage");
+    return storage;
+  }
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve player.html
@@ -22,9 +34,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Live Lectures
   app.get("/api/live-lectures", async (req, res) => {
     try {
-      const lectures = await storage.getLiveLectures();
+      const currentStorage = getStorage();
+      const lectures = await currentStorage.getLiveLectures();
       res.json(lectures);
     } catch (error) {
+      console.error("Error fetching live lectures:", error);
       res.status(500).json({ message: "Failed to fetch live lectures" });
     }
   });
@@ -32,9 +46,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/live-lectures", async (req, res) => {
     try {
       const validatedData = insertLiveLectureSchema.parse(req.body);
-      const lecture = await storage.createLiveLecture(validatedData);
+      const currentStorage = getStorage();
+      const lecture = await currentStorage.createLiveLecture(validatedData);
       res.status(201).json(lecture);
     } catch (error) {
+      console.error("Error creating live lecture:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: "Invalid input", errors: error.errors });
       } else {
@@ -46,7 +62,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/live-lectures/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const success = await storage.deleteLiveLecture(id);
+      const currentStorage = getStorage();
+      const success = await currentStorage.deleteLiveLecture(id);
 
       if (success) {
         res.json({ message: "Live lecture deleted successfully" });
@@ -54,6 +71,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(404).json({ message: "Live lecture not found" });
       }
     } catch (error) {
+      console.error("Error deleting live lecture:", error);
       res.status(500).json({ message: "Failed to delete live lecture" });
     }
   });
@@ -62,8 +80,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const { viewers } = req.body;
+      const currentStorage = getStorage();
 
-      const updated = await storage.updateLiveLecture(id, { viewers });
+      const updated = await currentStorage.updateLiveLecture(id, { viewers });
 
       if (updated) {
         res.json(updated);
@@ -71,6 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(404).json({ message: "Live lecture not found" });
       }
     } catch (error) {
+      console.error("Error updating viewer count:", error);
       res.status(500).json({ message: "Failed to update viewer count" });
     }
   });
@@ -79,9 +99,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/recorded-lectures", async (req, res) => {
     try {
       const subject = req.query.subject as string;
-      const lectures = await storage.getRecordedLectures(subject);
+      const currentStorage = getStorage();
+      const lectures = await currentStorage.getRecordedLectures(subject);
       res.json(lectures);
     } catch (error) {
+      console.error("Error fetching recorded lectures:", error);
       res.status(500).json({ message: "Failed to fetch recorded lectures" });
     }
   });
@@ -89,9 +111,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/recorded-lectures/subject/:subject", async (req, res) => {
     try {
       const subject = req.params.subject;
-      const lectures = await storage.getRecordedLecturesBySubject(subject);
+      const currentStorage = getStorage();
+      const lectures = await currentStorage.getRecordedLecturesBySubject(subject);
       res.json(lectures);
     } catch (error) {
+      console.error("Error fetching lectures by subject:", error);
       res.status(500).json({ message: "Failed to fetch lectures by subject" });
     }
   });
@@ -99,9 +123,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/recorded-lectures", async (req, res) => {
     try {
       const validatedData = insertRecordedLectureSchema.parse(req.body);
-      const lecture = await storage.createRecordedLecture(validatedData);
+      const currentStorage = getStorage();
+      const lecture = await currentStorage.createRecordedLecture(validatedData);
       res.status(201).json(lecture);
     } catch (error) {
+      console.error("Error creating recorded lecture:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: "Invalid input", errors: error.errors });
       } else {
@@ -113,7 +139,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/recorded-lectures/:id/bookmark", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const lecture = await storage.toggleBookmark(id);
+      const currentStorage = getStorage();
+      const lecture = await currentStorage.toggleBookmark(id);
 
       if (lecture) {
         res.json(lecture);
@@ -121,6 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(404).json({ message: "Recorded lecture not found" });
       }
     } catch (error) {
+      console.error("Error toggling bookmark:", error);
       res.status(500).json({ message: "Failed to toggle bookmark" });
     }
   });
@@ -134,6 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
+      const currentStorage = getStorage();
       const addedLectures = [];
       let errorCount = 0;
 
@@ -144,14 +173,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          const newLecture = await storage.createRecordedLecture({
+          const newLecture = await currentStorage.createRecordedLecture({
             title: lecture.lecture_name,
             subject: lecture.subject.toLowerCase(),
             youtubeUrl: lecture.lecture_link,
-            uploadDate: new Date(),
           });
           addedLectures.push(newLecture);
         } catch (error) {
+          console.error("Error adding bulk lecture:", error);
           errorCount++;
         }
       }
@@ -162,6 +191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         failed: errorCount
       });
     } catch (error) {
+      console.error("Error processing bulk lectures:", error);
       res.status(500).json({ message: "Failed to process bulk lectures" });
     }
   });
@@ -169,8 +199,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/recorded-lectures/:id/views", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const lecture = await storage.updateRecordedLecture(id, {
-        views: (await storage.getRecordedLectures()).find(l => l.id === id)?.views || 0 + 1
+      const currentStorage = getStorage();
+      
+      // Get current lecture to increment views
+      const lectures = await currentStorage.getRecordedLectures();
+      const currentLecture = lectures.find(l => l.id === id);
+      
+      if (!currentLecture) {
+        res.status(404).json({ message: "Recorded lecture not found" });
+        return;
+      }
+
+      const lecture = await currentStorage.updateRecordedLecture(id, {
+        views: (currentLecture.views || 0) + 1
       });
 
       if (lecture) {
@@ -179,6 +220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(404).json({ message: "Recorded lecture not found" });
       }
     } catch (error) {
+      console.error("Error updating view count:", error);
       res.status(500).json({ message: "Failed to update view count" });
     }
   });
@@ -186,7 +228,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/recorded-lectures/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const success = await storage.deleteRecordedLecture(id);
+      const currentStorage = getStorage();
+      const success = await currentStorage.deleteRecordedLecture(id);
 
       if (success) {
         res.json({ message: "Recorded lecture deleted successfully" });
@@ -194,6 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(404).json({ message: "Recorded lecture not found" });
       }
     } catch (error) {
+      console.error("Error deleting recorded lecture:", error);
       res.status(500).json({ message: "Failed to delete recorded lecture" });
     }
   });
@@ -201,8 +245,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stats endpoint
   app.get("/api/stats", async (req, res) => {
     try {
-      const liveLectures = await storage.getLiveLectures();
-      const recordedLectures = await storage.getRecordedLectures();
+      const currentStorage = getStorage();
+      const liveLectures = await currentStorage.getLiveLectures();
+      const recordedLectures = await currentStorage.getRecordedLectures();
 
       const stats = {
         liveLectures: liveLectures.length,
@@ -218,6 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(stats);
     } catch (error) {
+      console.error("Error fetching stats:", error);
       res.status(500).json({ message: "Failed to fetch stats" });
     }
   });
